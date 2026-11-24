@@ -1,5 +1,3 @@
-import { CHINA_CITIES } from '../data/china-cities.js';
-
 // 城市目录：默认上球的观测站 + 全国可搜索城市/区县。
 // 坐标与 IANA 时区用于展示本地时间；天气数据由 providers.js 获取。
 
@@ -89,48 +87,71 @@ function chinaKind(name, level) {
   return '区县';
 }
 
-const CHINA_CITY_CATALOG = CHINA_CITIES.map(([name, province, parent, level, lat, lon, prefKey], index) => {
-  const context =
-    level === 'district' && parent && parent !== province ? `${province} · ${parent}` : province;
-  return {
-    id: `cn-${index}`,
-    name,
-    en: '',
-    country: '中国',
-    province,
-    cityName: parent,
-    context,
-    level,
-    kind: chinaKind(name, level),
-    lat,
-    lon,
-    tz: 'Asia/Shanghai',
-    prefKey,
-    china: true,
-    featured: false,
-    searchText: [province, parent].filter(Boolean),
-    aliases: [],
-  };
-})
-  .filter((city) => !(city.level === 'city' && GLOBAL_CITY_NAMES.has(city.name.replace(/市$/, ''))))
-  .filter(
-    (city) =>
-      !/(开发区|管理区|工业园区|产业园|高新区|示范区|保税区|实验区|经济区|园区)$/.test(city.name),
-  );
+let CHINA_CITY_CATALOG = [];
+export let SEARCH_CATALOG = [...CITY_CATALOG];
+export let CHINA_STATS = { cities: 0, countyCities: 0, districts: 0, total: 0 };
+let chinaCitiesPromise = null;
 
-export const SEARCH_CATALOG = [...CITY_CATALOG, ...CHINA_CITY_CATALOG];
+function buildChinaCatalog(CHINA_CITIES) {
+  return CHINA_CITIES.map(([name, province, parent, level, lat, lon, prefKey], index) => {
+    const context =
+      level === 'district' && parent && parent !== province ? `${province} · ${parent}` : province;
+    return {
+      id: `cn-${index}`,
+      name,
+      en: '',
+      country: '中国',
+      province,
+      cityName: parent,
+      context,
+      level,
+      kind: chinaKind(name, level),
+      lat,
+      lon,
+      tz: 'Asia/Shanghai',
+      prefKey,
+      china: true,
+      featured: false,
+      searchText: [province, parent].filter(Boolean),
+      aliases: [],
+    };
+  })
+    .filter((city) => !(city.level === 'city' && GLOBAL_CITY_NAMES.has(city.name.replace(/市$/, ''))))
+    .filter(
+      (city) =>
+        !/(开发区|管理区|工业园区|产业园|高新区|示范区|保税区|实验区|经济区|园区)$/.test(city.name),
+    );
+}
 
-export const CHINA_STATS = (() => {
-  let cities = 0;
-  let countyCities = 0;
-  let districts = 0;
-  for (const [name, , , level] of CHINA_CITIES) {
-    if (level === 'city') cities += 1;
-    else if (name.endsWith('市')) countyCities += 1;
-    else districts += 1;
-  }
-  return { cities, countyCities, districts, total: CHINA_CITIES.length };
-})();
+export function isChinaCitiesLoaded() {
+  return CHINA_CITY_CATALOG.length > 0;
+}
+
+/** 延迟加载全国城市数据：不阻塞 3D 地球与首屏天气。 */
+export function loadChinaCities() {
+  if (isChinaCitiesLoaded()) return Promise.resolve(CHINA_STATS);
+  if (chinaCitiesPromise) return chinaCitiesPromise;
+  chinaCitiesPromise = import('../data/china-cities.js')
+    .then(({ CHINA_CITIES }) => {
+      CHINA_CITY_CATALOG = buildChinaCatalog(CHINA_CITIES);
+      SEARCH_CATALOG = [...CITY_CATALOG, ...CHINA_CITY_CATALOG];
+      let cities = 0;
+      let countyCities = 0;
+      let districts = 0;
+      for (const [name, , , level] of CHINA_CITIES) {
+        if (level === 'city') cities += 1;
+        else if (name.endsWith('市')) countyCities += 1;
+        else districts += 1;
+      }
+      CHINA_STATS = { cities, countyCities, districts, total: CHINA_CITIES.length };
+      return CHINA_STATS;
+    })
+    .catch((error) => {
+      chinaCitiesPromise = null;
+      throw error;
+    });
+  return chinaCitiesPromise;
+}
 
 function primaryScore(term, query) {
   if (!term) return 0;

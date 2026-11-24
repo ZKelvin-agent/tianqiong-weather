@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+import * as THREE from '../vendor/three.module.js';
 import { OrbitControls } from '../vendor/OrbitControls.js';
 import { subsolarPoint } from './solar.js';
 
@@ -62,12 +62,16 @@ export class WeatherGlobe {
     this.paused = false;
     this.lastSunUpdate = 0;
     this.ready = false;
+    this.failed = false;
+    this.failReason = '';
+    this.failCallbacks = new Set();
     this.pendingCities = null;
     this.readyPromise = new Promise((resolve) => {
       this.resolveReady = resolve;
     });
     this.init().catch((error) => {
       console.error('3D globe failed to start', error);
+      this.markFailed(error?.message || 'WebGL unavailable');
       this.ready = true;
       this.resolveReady();
     });
@@ -78,6 +82,11 @@ export class WeatherGlobe {
   async init() {
     const width = this.container.clientWidth || window.innerWidth;
     const height = this.container.clientHeight || window.innerHeight;
+
+    const probe = document.createElement('canvas');
+    const probeGl = probe.getContext('webgl2');
+    if (!probeGl) throw new Error('WebGL2 is not available');
+    probeGl.getExtension('WEBGL_lose_context')?.loseContext();
 
     this.renderer = new THREE.WebGLRenderer({
       antialias: true,
@@ -90,7 +99,16 @@ export class WeatherGlobe {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.02;
+    this.renderer.debug.onShaderError = () => {
+      console.error('3D shader compilation failed');
+      this.markFailed('shader');
+    };
     this.container.appendChild(this.renderer.domElement);
+    this.renderer.domElement.addEventListener('webglcontextlost', (event) => {
+      event.preventDefault();
+      console.error('WebGL context lost');
+      this.markFailed('WebGL context lost');
+    });
 
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(38, width / height, 0.01, 200);
@@ -323,6 +341,28 @@ export class WeatherGlobe {
     );
     this.scene.add(this.atmosphere);
     this.container.classList.add('is-ready');
+  }
+
+  markFailed(reason = 'WebGL unavailable') {
+    if (this.failed) return;
+    this.failed = true;
+    this.failReason = reason;
+    for (const callback of this.failCallbacks) {
+      try {
+        callback(reason);
+      } catch {
+        /* ignore listener errors */
+      }
+    }
+  }
+
+  onFail(callback) {
+    if (this.failed) {
+      callback(this.failReason);
+      return () => {};
+    }
+    this.failCallbacks.add(callback);
+    return () => this.failCallbacks.delete(callback);
   }
 
   updateSun(date = new Date()) {

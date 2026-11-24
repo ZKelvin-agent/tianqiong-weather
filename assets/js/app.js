@@ -2,6 +2,8 @@ import {
   CHINA_STATS,
   DEFAULT_CITIES,
   coordinateCity,
+  isChinaCitiesLoaded,
+  loadChinaCities,
   nearestChinaPrefKey,
   parseCoordinates,
   searchCities,
@@ -9,7 +11,12 @@ import {
 import { loadWeather } from './providers.js';
 import { WeatherGlobe } from './globe.js';
 import { conditionMeta, weatherSvg } from './icons.js';
-import { buildTravelAdvice, findLocalAttractions } from './travel.js';
+import {
+  buildTravelAdvice,
+  findLocalAttractions,
+  isAttractionsLoaded,
+  loadAttractions,
+} from './travel.js';
 import { formatLatLon, subsolarPoint, sunTimes } from './solar.js';
 
 const REFRESH_MS = 10 * 60 * 1000;
@@ -186,6 +193,7 @@ const state = {
   searchItems: [],
   searchIndex: -1,
   globeReady: false,
+  globeFailed: false,
   lastErrorAt: 0,
   failed: new Set(),
 };
@@ -241,6 +249,7 @@ function cacheDom() {
   el.emptyRetry = $('emptyRetry');
   el.boot = $('boot');
   el.bootText = $('bootText');
+  el.globeFallback = $('globeFallback');
 }
 
 function restoreCities() {
@@ -672,12 +681,16 @@ function setDetailTab(tab, focus = false) {
   state.detailTab = tab === 'travel' ? 'travel' : 'weather';
   applyDetailTab();
   el.detailScroll.scrollTop = 0;
+  if (state.detailTab === 'travel' && state.selectedId) {
+    const city = state.cities.find((entry) => entry.id === state.selectedId);
+    if (city) renderTravel(city, state.weather.get(city.id));
+  }
   if (focus) {
     (state.detailTab === 'travel' ? el.tabTravel : el.tabWeather).focus();
   }
 }
 
-function renderTravel(city, weather) {
+async function renderTravel(city, weather) {
   const advice = weather ? buildTravelAdvice(weather, city) : null;
   if (advice) {
     el.detailAdvice.innerHTML = `
@@ -699,6 +712,27 @@ function renderTravel(city, weather) {
     el.detailAdvice.innerHTML = '<p class="travel-empty">正在获取天气数据…</p>';
   }
 
+  if (!isAttractionsLoaded() && state.detailTab !== 'travel') {
+    el.detailAttractionNote.textContent = '5A / 4A';
+    el.detailAttractions.innerHTML =
+      '<p class="travel-empty">打开「出行 & 景点」后加载当地景点</p>';
+    return;
+  }
+  if (!isAttractionsLoaded()) {
+    el.detailAttractionNote.textContent = '5A / 4A';
+    el.detailAttractions.innerHTML = '<p class="travel-empty">正在加载当地景点…</p>';
+    try {
+      await loadAttractions();
+    } catch (error) {
+      console.error('景点数据加载失败', error);
+      if (state.selectedId === city.id) {
+        el.detailAttractions.innerHTML =
+          '<p class="travel-empty">当地景点数据加载失败，重新切换「出行 & 景点」重试。</p>';
+      }
+      return;
+    }
+    if (state.selectedId !== city.id) return;
+  }
   const result = findLocalAttractions(city);
   if (result.outOfChina) {
     el.detailAttractionNote.textContent = '中国境内';
@@ -988,6 +1022,21 @@ function updateSearchResults() {
     closeSearch();
     return;
   }
+  if (!isChinaCitiesLoaded()) {
+    el.searchResults.hidden = false;
+    el.searchInput.setAttribute('aria-expanded', 'true');
+    state.searchItems = [];
+    state.searchIndex = -1;
+    el.searchResults.innerHTML = '<div class="search-meta">正在加载全国城市…</div>';
+    loadChinaCities()
+      .then(() => {
+        if (el.searchInput.value.trim()) updateSearchResults();
+      })
+      .catch(() => {
+        el.searchResults.innerHTML = '<div class="search-meta">全国城市数据加载失败，请重试</div>';
+      });
+    return;
+  }
   const items = [];
   const coord = parseCoordinates(query);
   if (coord) items.push({ type: 'coord', lat: coord.lat, lon: coord.lon });
@@ -1003,7 +1052,9 @@ function renderSearchResults() {
   const items = state.searchItems;
   el.searchResults.hidden = false;
   el.searchInput.setAttribute('aria-expanded', 'true');
-  const meta = `<div class="search-meta">全国 ${CHINA_STATS.cities} 市 · ${CHINA_STATS.countyCities} 县级市 · ${CHINA_STATS.districts} 区县</div>`;
+  const meta = CHINA_STATS.total
+    ? `<div class="search-meta">全国 ${CHINA_STATS.cities} 市 · ${CHINA_STATS.countyCities} 县级市 · ${CHINA_STATS.districts} 区县</div>`
+    : '<div class="search-meta">正在加载全国城市…</div>';
   if (!items.length) {
     el.searchResults.innerHTML = `${meta}<div class="search-empty">未找到匹配的城市或区县</div>`;
     return;
@@ -1175,6 +1226,16 @@ function hideBoot() {
   el.boot.classList.add('is-hidden');
 }
 
+function showGlobeFallback(reason = 'WebGL unavailable') {
+  if (state.globeFailed) return;
+  state.globeFailed = true;
+  console.warn('3D globe disabled, using static fallback:', reason);
+  el.globeFallback.hidden = false;
+  el.scene.classList.add('is-failed');
+  el.markerLayer.hidden = true;
+  hideBoot();
+}
+
 /* ---------------------------------- frame --------------------------------- */
 
 function updateMarkerPositions() {
@@ -1290,6 +1351,7 @@ function wireEvents() {
     if (!document.hidden && state.nextAt && Date.now() >= state.nextAt) refresh();
   });
 
+  globe?.onFail(showGlobeFallback);
   globe?.onFrame(updateMarkerPositions);
   globe?.onHover((point) => {
     if (!point) {
@@ -1319,11 +1381,27 @@ function init() {
   updateStatus();
 
   globe.whenReady().then(() => {
+    if (globe.failed) {
+      showGlobeFallback(globe.failReason);
+      return;
+    }
     renderWeather();
     globe.setActive(state.selectedId);
     setTimeout(hideBoot, 650);
   });
   setTimeout(hideBoot, 5000);
+  setTimeout(() => {
+    if (!el.boot.classList.contains('is-hidden')) {
+      el.bootText.textContent =
+        '加载较慢？如使用飞书内置浏览器，请点右上角 ··· → 在浏览器中打开';
+    }
+  }, 7000);
+
+  loadChinaCities()
+    .then(() => {
+      if (!el.searchResults.hidden) renderSearchResults();
+    })
+    .catch((error) => console.error('全国城市数据加载失败', error));
 
   state.nextAt = Date.now() + 500;
   setInterval(tick, 1000);

@@ -150,7 +150,19 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+    <div class="globe-fallback" id="globeFallback" hidden>
+      <div class="fallback-visual">
+        <img src="assets/textures/globe-still.jpg" alt="静态地球视图" />
+      </div>
+      <div class="fallback-copy" role="status">
+        <p class="fallback-kicker">STATIC GLOBE · 兼容模式</p>
+        <p class="fallback-title">当前浏览器未启用 3D 地球</p>
+        <p class="fallback-sub">天气与城市数据仍可使用。请用最新版 Chrome / Safari 打开；如使用飞书内置浏览器，点右上角 ··· → 在浏览器中打开。</p>
+      </div>
+    </div>
+
     <div class="boot" id="boot">
+      <img class="boot-globe" src="assets/textures/globe-still.jpg" alt="" aria-hidden="true" />
       <div class="boot-orbit" aria-hidden="true"><span></span></div>
       <p class="boot-title">天穹气象台</p>
       <p class="boot-sub" id="bootText">正在校准轨道 · 接入实时气象数据</p>
@@ -161,9 +173,6 @@
       <div class="noscript">此页面需要启用 JavaScript 才能渲染 3D 地球与实时天气。</div>
     </noscript>
 
-    <script type="importmap">
-      { "imports": { "three": "./assets/vendor/three.module.js" } }
-    </script>
     <script type="module" src="assets/js/app.js"></script>
   </body>
 </html>

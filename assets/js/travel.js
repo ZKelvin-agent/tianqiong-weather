@@ -1,7 +1,6 @@
 // 出行建议与当地景点。
 // 建议由实时天气 + 未来逐时数据生成；景点来自内置的 China Top Attractions 5A/4A 数据集，
 // 按“所在城市/地区”（prefKey）分组，不依赖景点坐标。
-import { CHINA_ATTRACTIONS } from '../data/china-attractions.js';
 import { conditionMeta } from './icons.js';
 
 const RAIN_CODES = new Set([
@@ -19,6 +18,28 @@ const RAIN_CODES = new Set([
   'snowShower',
 ]);
 const SNOW_CODES = new Set(['sleet', 'lightSnow', 'snow', 'heavySnow', 'snowShower']);
+
+let CHINA_ATTRACTIONS = [];
+let attractionsPromise = null;
+
+export function isAttractionsLoaded() {
+  return CHINA_ATTRACTIONS.length > 0;
+}
+
+/** 延迟加载景区数据：只在打开「出行 & 景点」时加载。 */
+export function loadAttractions() {
+  if (CHINA_ATTRACTIONS.length) return Promise.resolve();
+  if (attractionsPromise) return attractionsPromise;
+  attractionsPromise = import('../data/china-attractions.js')
+    .then(({ CHINA_ATTRACTIONS: data }) => {
+      CHINA_ATTRACTIONS = data;
+    })
+    .catch((error) => {
+      attractionsPromise = null;
+      throw error;
+    });
+  return attractionsPromise;
+}
 const WIND_NAMES = ['北', '东北', '东', '东南', '南', '西南', '西', '西北'];
 
 function isRainy(code) {

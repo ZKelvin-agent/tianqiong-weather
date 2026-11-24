@@ -112,7 +112,8 @@ export class WeatherGlobe {
 
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(38, width / height, 0.01, 200);
-    this.camera.position.copy(latLonToVec3(18, 105, this.fitDistance()));
+    const initialSun = subsolarPoint(new Date());
+    this.camera.position.copy(latLonToVec3(initialSun.lat, initialSun.lon, this.fitDistance()));
     this.camera.lookAt(0, 0, 0);
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
@@ -122,7 +123,7 @@ export class WeatherGlobe {
     this.controls.enablePan = false;
     this.controls.rotateSpeed = 0.55;
     this.controls.zoomSpeed = 0.65;
-    this.controls.minDistance = 2.05;
+    this.controls.minDistance = 1.52;
     this.controls.maxDistance = 9.5;
     this.controls.minPolarAngle = 0.04;
     this.controls.maxPolarAngle = Math.PI - 0.04;
@@ -148,16 +149,23 @@ export class WeatherGlobe {
     const loader = new THREE.TextureLoader();
     const base = new URL('../textures/', import.meta.url);
     try {
-      const [dayTex, nightTex, cloudTex] = await Promise.all([
-        loader.loadAsync(new URL('earth-day.jpg', base).href),
-        loader.loadAsync(new URL('earth-night.png', base).href),
-        loader.loadAsync(new URL('earth-clouds.png', base).href),
+      const maxAniso = Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
+      const [dayTex, nightTex, cloudTex, bumpTex, waterTex] = await Promise.all([
+        loader.loadAsync(new URL('earth-day-4k.jpg', base).href),
+        loader.loadAsync(new URL('earth-night-4k.jpg', base).href),
+        loader.loadAsync(new URL('earth-clouds-4k.png', base).href),
+        loader.loadAsync(new URL('earth-bump-4k.jpg', base).href),
+        loader.loadAsync(new URL('earth-water-4k.png', base).href),
       ]);
       dayTex.colorSpace = THREE.SRGBColorSpace;
-      dayTex.anisotropy = Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
+      dayTex.anisotropy = maxAniso;
       nightTex.colorSpace = THREE.SRGBColorSpace;
+      nightTex.anisotropy = maxAniso;
       cloudTex.colorSpace = THREE.SRGBColorSpace;
-      this.buildEarth(dayTex, nightTex, cloudTex);
+      cloudTex.anisotropy = maxAniso;
+      bumpTex.anisotropy = maxAniso;
+      waterTex.anisotropy = maxAniso;
+      this.buildEarth(dayTex, nightTex, cloudTex, bumpTex, waterTex);
     } catch (error) {
       console.error('地球贴图加载失败', error);
       this.buildFallbackEarth();
@@ -223,11 +231,13 @@ export class WeatherGlobe {
     this.scene.add(this.stars);
   }
 
-  buildEarth(dayTex, nightTex, cloudTex) {
+  buildEarth(dayTex, nightTex, cloudTex, bumpTex, waterTex) {
     this.earthMaterial = new THREE.ShaderMaterial({
       uniforms: {
         uDay: { value: dayTex },
         uNight: { value: nightTex },
+        uBump: { value: bumpTex },
+        uWater: { value: waterTex },
         uSun: { value: new THREE.Vector3(1, 0, 0) },
       },
       vertexShader: `
@@ -245,19 +255,32 @@ export class WeatherGlobe {
       fragmentShader: `
         uniform sampler2D uDay;
         uniform sampler2D uNight;
+        uniform sampler2D uBump;
+        uniform sampler2D uWater;
         uniform vec3 uSun;
         varying vec2 vUv;
         varying vec3 vWorldNormal;
         varying vec3 vWorldPos;
         void main() {
           vec3 normal = normalize(vWorldNormal);
-          float sun = dot(normal, normalize(uSun));
+          vec3 east = normalize(cross(vec3(0.0, 1.0, 0.0), normal));
+          vec3 north = normalize(cross(normal, east));
+          float h = texture2D(uBump, vUv).r;
+          float hEast = texture2D(uBump, vUv + vec2(1.0 / 4096.0, 0.0)).r;
+          float hNorth = texture2D(uBump, vUv + vec2(0.0, 1.0 / 2048.0)).r;
+          normal = normalize(normal + east * (h - hEast) * 2.4 + north * (h - hNorth) * 2.4);
+          vec3 sunDir = normalize(uSun);
+          float sun = dot(normal, sunDir);
           float daylight = smoothstep(-0.16, 0.22, sun);
           vec3 dayCol = texture2D(uDay, vUv).rgb;
           vec3 nightCol = texture2D(uNight, vUv).rgb;
           vec3 col = mix(nightCol * 1.18 + dayCol * 0.018, dayCol, daylight);
-          col = mix(col, col * vec3(0.9, 1.0, 1.09), 0.22);
+          float ocean = texture2D(uWater, vUv).r;
           vec3 viewDir = normalize(cameraPosition - vWorldPos);
+          vec3 halfDir = normalize(sunDir + viewDir);
+          float specular = pow(max(dot(normal, halfDir), 0.0), 90.0) * ocean * smoothstep(-0.05, 0.35, sun);
+          col += vec3(1.0, 0.94, 0.82) * specular * 0.5;
+          col = mix(col, col * vec3(0.9, 1.0, 1.09), 0.18);
           float fresnel = pow(1.0 - clamp(dot(normal, viewDir), 0.0, 1.0), 3.0);
           col += vec3(0.10, 0.24, 0.4) * fresnel * 0.55;
           gl_FragColor = vec4(col, 1.0);
@@ -267,7 +290,7 @@ export class WeatherGlobe {
       `,
     });
 
-    this.earth = new THREE.Mesh(new THREE.SphereGeometry(R, 128, 96), this.earthMaterial);
+    this.earth = new THREE.Mesh(new THREE.SphereGeometry(R, 192, 128), this.earthMaterial);
     this.earth.rotation.y = 0;
     this.scene.add(this.earth);
 

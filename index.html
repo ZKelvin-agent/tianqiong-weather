@@ -41,8 +41,8 @@
               type="search"
               autocomplete="off"
               spellcheck="false"
-              placeholder="搜索城市，或输入坐标"
-              aria-label="搜索城市或输入经纬度"
+              placeholder="搜索全国城市 / 区县，或坐标"
+              aria-label="搜索全国城市、区县或输入经纬度"
               aria-expanded="false"
               aria-controls="searchResults"
             />
@@ -106,20 +106,40 @@
           </div>
         </div>
 
-        <div class="detail-metrics" id="detailMetrics"></div>
+        <div class="detail-tabs" role="tablist" aria-label="城市详情视图">
+          <button class="detail-tab is-active" id="tabWeather" type="button" role="tab" aria-selected="true" aria-controls="paneWeather" data-tab="weather">天气</button>
+          <button class="detail-tab" id="tabTravel" type="button" role="tab" aria-selected="false" aria-controls="paneTravel" data-tab="travel" tabindex="-1">出行 &amp; 景点</button>
+        </div>
 
-        <section class="detail-section">
-          <div class="section-head"><h3>未来 24 小时</h3><span class="section-note">气温 °C</span></div>
-          <div class="chart" id="detailChart"></div>
-        </section>
+        <div class="tab-pane" id="paneWeather" role="tabpanel" aria-labelledby="tabWeather" data-pane="weather">
+          <div class="detail-metrics" id="detailMetrics"></div>
 
-        <section class="detail-section">
-          <div class="section-head"><h3>五日预报</h3><span class="section-note">最高 / 最低</span></div>
-          <div class="daily" id="detailDaily"></div>
-        </section>
+          <section class="detail-section">
+            <div class="section-head"><h3>未来 24 小时</h3><span class="section-note">气温 °C</span></div>
+            <div class="chart" id="detailChart"></div>
+          </section>
 
-        <div class="sun-row" id="detailSun"></div>
-        <p class="detail-source" id="detailSource">—</p>
+          <section class="detail-section">
+            <div class="section-head"><h3>五日预报</h3><span class="section-note">最高 / 最低</span></div>
+            <div class="daily" id="detailDaily"></div>
+          </section>
+
+          <div class="sun-row" id="detailSun"></div>
+          <p class="detail-source" id="detailSource">—</p>
+        </div>
+
+        <div class="tab-pane" id="paneTravel" role="tabpanel" aria-labelledby="tabTravel" data-pane="travel" hidden>
+          <section class="travel-block">
+            <div class="travel-head"><h3>出行建议</h3><span>未来 12 小时</span></div>
+            <div class="advice" id="detailAdvice"><p class="travel-empty">正在获取天气…</p></div>
+          </section>
+
+          <section class="travel-block">
+            <div class="travel-head"><h3>当地推荐景点</h3><span id="detailAttractionNote">5A / 4A</span></div>
+            <div class="attraction-list" id="detailAttractions"><p class="travel-empty">正在加载…</p></div>
+            <p class="travel-source">景点数据：<a href="https://chinatopattractions.com/china-attractions-dataset/" target="_blank" rel="noopener">China Top Attractions</a>（CC BY 4.0，2026-08 校验）；城市数据：<a href="https://github.com/qfz9527/city-geo" target="_blank" rel="noopener">city-geo</a>（Mulan PSL v2）。</p>
+          </section>
+        </div>
       </div>
     </aside>
 

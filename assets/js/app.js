@@ -1,12 +1,15 @@
 import {
+  CHINA_STATS,
   DEFAULT_CITIES,
   coordinateCity,
+  nearestChinaPrefKey,
   parseCoordinates,
   searchCities,
 } from './cities.js';
 import { loadWeather } from './providers.js';
 import { WeatherGlobe } from './globe.js';
 import { conditionMeta, weatherSvg } from './icons.js';
+import { buildTravelAdvice, findLocalAttractions } from './travel.js';
 import { formatLatLon, subsolarPoint, sunTimes } from './solar.js';
 
 const REFRESH_MS = 10 * 60 * 1000;
@@ -179,6 +182,7 @@ const state = {
   loading: false,
   fromCache: false,
   error: null,
+  detailTab: 'weather',
   searchItems: [],
   searchIndex: -1,
   globeReady: false,
@@ -223,6 +227,13 @@ function cacheDom() {
   el.detailDaily = $('detailDaily');
   el.detailSun = $('detailSun');
   el.detailSource = $('detailSource');
+  el.tabWeather = $('tabWeather');
+  el.tabTravel = $('tabTravel');
+  el.paneWeather = $('paneWeather');
+  el.paneTravel = $('paneTravel');
+  el.detailAdvice = $('detailAdvice');
+  el.detailAttractions = $('detailAttractions');
+  el.detailAttractionNote = $('detailAttractionNote');
   el.cursorCoords = $('cursorCoords');
   el.toast = $('toast');
   el.emptyNote = $('emptyNote');
@@ -249,6 +260,12 @@ function restoreCities() {
         name: String(item.name || '自定义位置'),
         en: String(item.en || ''),
         country: String(item.country || '自定义坐标'),
+        province: item.province || '',
+        cityName: item.cityName || '',
+        context: item.context || '',
+        level: item.level || '',
+        kind: item.kind || '',
+        prefKey: item.prefKey || '',
         lat: item.lat,
         lon: item.lon,
         tz: item.tz || timezoneForLongitude(item.lon),
@@ -267,6 +284,12 @@ function persistAddedCities() {
       name: city.name,
       en: city.en,
       country: city.country,
+      province: city.province || '',
+      cityName: city.cityName || '',
+      context: city.context || '',
+      level: city.level || '',
+      kind: city.kind || '',
+      prefKey: city.prefKey || '',
       lat: city.lat,
       lon: city.lon,
       tz: city.tz,
@@ -593,7 +616,7 @@ function renderDetail(id) {
   const now = new Date();
   const tz = weather?.tz || city.tz;
 
-  el.detailCountry.textContent = `${city.country} · ${zoneOffsetLabel(tz)}`;
+  el.detailCountry.textContent = `${city.context || city.country} · ${zoneOffsetLabel(tz)}`;
   el.detailName.textContent = city.name;
   el.detailLocal.textContent = clockInZone(now, tz);
   el.detailDate.textContent = detailDateInZone(now, tz);
@@ -624,10 +647,93 @@ function renderDetail(id) {
     el.detailSource.textContent = failed ? '数据连接失败 · 可点击刷新重试' : '数据连接中';
   }
 
+  applyDetailTab();
+  renderTravel(city, weather);
+
   if (state.selectedRenderedId !== id) {
     el.detailScroll.scrollTop = 0;
     state.selectedRenderedId = id;
   }
+}
+
+function applyDetailTab() {
+  const tab = state.detailTab === 'travel' ? 'travel' : 'weather';
+  el.tabWeather.classList.toggle('is-active', tab === 'weather');
+  el.tabTravel.classList.toggle('is-active', tab === 'travel');
+  el.tabWeather.setAttribute('aria-selected', tab === 'weather');
+  el.tabTravel.setAttribute('aria-selected', tab === 'travel');
+  el.tabWeather.tabIndex = tab === 'weather' ? 0 : -1;
+  el.tabTravel.tabIndex = tab === 'travel' ? 0 : -1;
+  el.paneWeather.hidden = tab !== 'weather';
+  el.paneTravel.hidden = tab !== 'travel';
+}
+
+function setDetailTab(tab, focus = false) {
+  state.detailTab = tab === 'travel' ? 'travel' : 'weather';
+  applyDetailTab();
+  el.detailScroll.scrollTop = 0;
+  if (focus) {
+    (state.detailTab === 'travel' ? el.tabTravel : el.tabWeather).focus();
+  }
+}
+
+function renderTravel(city, weather) {
+  const advice = weather ? buildTravelAdvice(weather, city) : null;
+  if (advice) {
+    el.detailAdvice.innerHTML = `
+      <div class="advice-hero">
+        <p class="advice-kicker">今日出行</p>
+        <h4 class="advice-title">${escapeHtml(advice.headline)}</h4>
+        <p class="advice-sub">${escapeHtml(advice.summary)}</p>
+      </div>
+      <div class="advice-grid">
+        ${advice.items
+          .map(
+            (item) =>
+              `<div class="advice-item"><span>${escapeHtml(item.label)}</span><p>${escapeHtml(item.text)}</p></div>`,
+          )
+          .join('')}
+      </div>
+      <p class="advice-note">${escapeHtml(advice.note)}</p>`;
+  } else {
+    el.detailAdvice.innerHTML = '<p class="travel-empty">正在获取天气数据…</p>';
+  }
+
+  const result = findLocalAttractions(city);
+  if (result.outOfChina) {
+    el.detailAttractionNote.textContent = '中国境内';
+    el.detailAttractions.innerHTML =
+      '<p class="travel-empty">景点推荐目前覆盖中国境内；该城市位于境外。</p>';
+    return;
+  }
+  if (!result.items.length) {
+    el.detailAttractionNote.textContent = '5A / 4A';
+    el.detailAttractions.innerHTML = `<p class="travel-empty">${escapeHtml(
+      result.prefKey || '所在地区',
+    )}暂无 4A/5A 景区收录。</p>`;
+    return;
+  }
+  el.detailAttractionNote.textContent = `${result.prefKey} · ${result.items.length} 个 5A/4A`;
+  el.detailAttractions.innerHTML = result.items
+    .map((item, index) => {
+      const rating = `<em class="attr-rating ${item.rating === '5A' ? 'is-5a' : 'is-4a'}">${item.rating}</em>`;
+      const meta = [item.region, item.ticket ? `门票 ${item.ticket}` : null]
+        .filter(Boolean)
+        .join(' · ');
+      const sub = [item.duration ? `建议 ${item.duration}` : null, item.hours || null]
+        .filter(Boolean)
+        .join(' · ');
+      const body = `<span class="attr-rank">${String(index + 1).padStart(2, '0')}</span>
+        <span class="attr-main">
+          <span class="attr-title"><b title="${escapeHtml(item.fullName)}">${escapeHtml(item.name)}</b>${rating}</span>
+          <span class="attr-meta">${escapeHtml(meta)}</span>
+          ${sub ? `<span class="attr-hours">${escapeHtml(sub)}</span>` : ''}
+        </span>`;
+      return item.url
+        ? `<a class="attraction" href="${escapeHtml(item.url)}" target="_blank" rel="noopener">${body}<span class="attr-arrow">↗</span></a>`
+        : `<div class="attraction">${body}</div>`;
+    })
+    .join('');
 }
 
 function metricValue(value, unit, digits = 0) {
@@ -885,7 +991,7 @@ function updateSearchResults() {
   const items = [];
   const coord = parseCoordinates(query);
   if (coord) items.push({ type: 'coord', lat: coord.lat, lon: coord.lon });
-  for (const city of searchCities(query, 6)) {
+  for (const city of searchCities(query, 8)) {
     items.push({ type: 'city', city });
   }
   state.searchItems = items;
@@ -897,34 +1003,44 @@ function renderSearchResults() {
   const items = state.searchItems;
   el.searchResults.hidden = false;
   el.searchInput.setAttribute('aria-expanded', 'true');
+  const meta = `<div class="search-meta">全国 ${CHINA_STATS.cities} 市 · ${CHINA_STATS.countyCities} 县级市 · ${CHINA_STATS.districts} 区县</div>`;
   if (!items.length) {
-    el.searchResults.innerHTML = '<div class="search-empty">未找到匹配的城市</div>';
+    el.searchResults.innerHTML = `${meta}<div class="search-empty">未找到匹配的城市或区县</div>`;
     return;
   }
-  el.searchResults.innerHTML = items
-    .map((item, index) => {
-      if (item.type === 'coord') {
-        const { ns, ew } = formatLatLon(item.lat, item.lon);
-        return `<button type="button" class="search-item ${index === state.searchIndex ? 'is-active' : ''}" data-index="${index}" role="option">
+  el.searchResults.innerHTML =
+    meta +
+    items
+      .map((item, index) => {
+        if (item.type === 'coord') {
+          const { ns, ew } = formatLatLon(item.lat, item.lon);
+          return `<button type="button" class="search-item ${index === state.searchIndex ? 'is-active' : ''}" data-index="${index}" role="option">
           <span class="search-item-main">
             <span class="search-item-name">${ns} · ${ew}</span>
             <span class="search-item-meta">自定义坐标 · 点击添加到球面</span>
           </span>
           <span class="search-item-flag">坐标</span>
         </button>`;
-      }
-      const { city } = item;
-      const onGlobe = state.cities.some((entry) => entry.id === city.id);
-      const { ns, ew } = formatLatLon(city.lat, city.lon);
-      return `<button type="button" class="search-item ${index === state.searchIndex ? 'is-active' : ''}" data-index="${index}" role="option">
+        }
+        const { city } = item;
+        const onGlobe = state.cities.some((entry) => entry.id === city.id);
+        const { ns, ew } = formatLatLon(city.lat, city.lon);
+        const areaMeta = city.china
+          ? `${city.context} · ${ns} ${ew}`
+          : `${city.country} · ${ns} ${ew}${city.en ? ` · ${city.en}` : ''}`;
+        const level = city.kind
+          ? `<span class="search-item-level">${escapeHtml(city.kind)}</span>`
+          : '';
+        return `<button type="button" class="search-item ${index === state.searchIndex ? 'is-active' : ''}" data-index="${index}" role="option">
         <span class="search-item-main">
           <span class="search-item-name">${escapeHtml(city.name)}</span>
-          <span class="search-item-meta">${escapeHtml(city.country)} · ${ns} ${ew} · ${escapeHtml(city.en)}</span>
+          <span class="search-item-meta">${escapeHtml(areaMeta)}</span>
         </span>
+        ${level}
         <span class="search-item-flag">${onGlobe ? '球面' : '添加'}</span>
       </button>`;
-    })
-    .join('');
+      })
+      .join('');
 }
 
 function closeSearch() {
@@ -941,6 +1057,8 @@ function selectSearchItem(index) {
   el.searchInput.blur();
   if (item.type === 'coord') {
     const city = coordinateCity(item.lat, item.lon, timezoneForLongitude(item.lon));
+    const prefKey = nearestChinaPrefKey(item.lat, item.lon);
+    if (prefKey) city.prefKey = prefKey;
     addCity(city);
     selectCity(city.id, { focus: true });
   } else {
@@ -1001,6 +1119,7 @@ async function locateMe() {
       lat,
       lon,
       tz: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+      prefKey: nearestChinaPrefKey(lat, lon),
       geo: true,
     };
     const existing = state.cities.find((entry) => entry.id === 'geo');
@@ -1111,6 +1230,17 @@ function wireEvents() {
   el.emptyRetry.addEventListener('click', refresh);
   el.detailClose.addEventListener('click', closeDetail);
 
+  el.tabWeather.addEventListener('click', () => setDetailTab('weather'));
+  el.tabTravel.addEventListener('click', () => setDetailTab('travel'));
+  for (const tab of [el.tabWeather, el.tabTravel]) {
+    tab.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+        event.preventDefault();
+        setDetailTab(state.detailTab === 'weather' ? 'travel' : 'weather', true);
+      }
+    });
+  }
+
   el.searchInput.addEventListener('input', updateSearchResults);
   el.searchInput.addEventListener('focus', () => {
     if (el.searchInput.value.trim()) updateSearchResults();
@@ -1177,6 +1307,7 @@ function wireEvents() {
 function init() {
   cacheDom();
   el.detail.inert = true;
+  applyDetailTab();
   restoreCities();
   loadCachedWeather();
 

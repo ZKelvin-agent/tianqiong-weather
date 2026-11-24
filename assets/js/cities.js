@@ -1,4 +1,6 @@
-// 城市目录：默认上球的观测站 + 可搜索的扩展城市。
+import { CHINA_CITIES } from '../data/china-cities.js';
+
+// 城市目录：默认上球的观测站 + 全国可搜索城市/区县。
 // 坐标与 IANA 时区用于展示本地时间；天气数据由 providers.js 获取。
 
 export const CITY_CATALOG = [
@@ -16,6 +18,7 @@ export const CITY_CATALOG = [
   { id: 'urumqi', name: '乌鲁木齐', en: 'Urumqi', country: '中国', lat: 43.8256, lon: 87.6168, tz: 'Asia/Shanghai' },
   { id: 'hongkong', name: '香港', en: 'Hong Kong', country: '中国', lat: 22.3193, lon: 114.1694, tz: 'Asia/Hong_Kong', featured: true, aliases: ['hk'] },
   { id: 'taipei', name: '台北', en: 'Taipei', country: '中国', lat: 25.033, lon: 121.5654, tz: 'Asia/Taipei' },
+  { id: 'macau', name: '澳门', en: 'Macau', country: '中国', lat: 22.1987, lon: 113.5439, tz: 'Asia/Macau' },
   { id: 'tokyo', name: '东京', en: 'Tokyo', country: '日本', lat: 35.6762, lon: 139.6503, tz: 'Asia/Tokyo', featured: true, aliases: ['tokio'] },
   { id: 'osaka', name: '大阪', en: 'Osaka', country: '日本', lat: 34.6937, lon: 135.5023, tz: 'Asia/Tokyo' },
   { id: 'seoul', name: '首尔', en: 'Seoul', country: '韩国', lat: 37.5665, lon: 126.978, tz: 'Asia/Seoul' },
@@ -77,24 +80,137 @@ export const CITY_CATALOG = [
 
 export const DEFAULT_CITIES = CITY_CATALOG.filter((c) => c.featured);
 
-export function searchCities(query, limit = 6) {
+const GLOBAL_CITY_NAMES = new Set(CITY_CATALOG.map((city) => city.name.replace(/市$/, '')));
+
+function chinaKind(name, level) {
+  if (level === 'city') return '城市';
+  if (name.endsWith('市')) return '县级市';
+  if (name.endsWith('区')) return '市辖区';
+  return '区县';
+}
+
+const CHINA_CITY_CATALOG = CHINA_CITIES.map(([name, province, parent, level, lat, lon, prefKey], index) => {
+  const context =
+    level === 'district' && parent && parent !== province ? `${province} · ${parent}` : province;
+  return {
+    id: `cn-${index}`,
+    name,
+    en: '',
+    country: '中国',
+    province,
+    cityName: parent,
+    context,
+    level,
+    kind: chinaKind(name, level),
+    lat,
+    lon,
+    tz: 'Asia/Shanghai',
+    prefKey,
+    china: true,
+    featured: false,
+    searchText: [province, parent].filter(Boolean),
+    aliases: [],
+  };
+})
+  .filter((city) => !(city.level === 'city' && GLOBAL_CITY_NAMES.has(city.name.replace(/市$/, ''))))
+  .filter(
+    (city) =>
+      !/(开发区|管理区|工业园区|产业园|高新区|示范区|保税区|实验区|经济区|园区)$/.test(city.name),
+  );
+
+export const SEARCH_CATALOG = [...CITY_CATALOG, ...CHINA_CITY_CATALOG];
+
+export const CHINA_STATS = (() => {
+  let cities = 0;
+  let countyCities = 0;
+  let districts = 0;
+  for (const [name, , , level] of CHINA_CITIES) {
+    if (level === 'city') cities += 1;
+    else if (name.endsWith('市')) countyCities += 1;
+    else districts += 1;
+  }
+  return { cities, countyCities, districts, total: CHINA_CITIES.length };
+})();
+
+function primaryScore(term, query) {
+  if (!term) return 0;
+  const h = term.toLowerCase();
+  if (h === query) return 100;
+  if (h.startsWith(query)) return 80;
+  if (h.includes(query)) return 50;
+  return 0;
+}
+
+export function searchCities(query, limit = 8) {
   const q = query.trim().toLowerCase();
   if (!q) return [];
   const scored = [];
-  for (const city of CITY_CATALOG) {
-    const haystacks = [city.name, city.en, city.country, ...(city.aliases || [])].map((s) => s.toLowerCase());
+  for (const city of SEARCH_CATALOG) {
     let score = 0;
-    for (const h of haystacks) {
-      if (h === q) score = Math.max(score, 100);
-      else if (h.startsWith(q)) score = Math.max(score, 80);
-      else if (h.includes(q)) score = Math.max(score, 50);
+    for (const term of [city.name, city.en, ...(city.aliases || [])]) {
+      score = Math.max(score, primaryScore(term, q));
     }
-    if (score) scored.push({ city, score });
+    if (score === 0) {
+      const secondary = city.china ? city.searchText : [city.country];
+      for (const term of secondary || []) {
+        if (!term) continue;
+        const h = term.toLowerCase();
+        if (h === q) score = Math.max(score, 32);
+        else if (h.startsWith(q)) score = Math.max(score, 26);
+        else if (h.includes(q)) score = Math.max(score, 20);
+      }
+    }
+    if (q.length >= 2 && city.province && city.province.includes(query.trim())) {
+      score = Math.max(score, 68 + (city.level === 'city' ? 12 : 0));
+    }
+    if (!score) continue;
+    if (city.level === 'city') score += 8;
+    else if (city.kind === '县级市') score += 4;
+    if (city.featured) score += 3;
+    scored.push({ city, score });
   }
+  const rank = (city) =>
+    !city.china || city.level === 'city'
+      ? 0
+      : city.kind === '县级市'
+        ? 1
+        : city.kind === '市辖区'
+          ? 2
+          : 3;
   return scored
-    .sort((a, b) => b.score - a.score || a.city.name.localeCompare(b.city.name, 'zh'))
+    .sort(
+      (a, b) =>
+        b.score - a.score ||
+        rank(a.city) - rank(b.city) ||
+        a.city.name.localeCompare(b.city.name, 'zh'),
+    )
     .slice(0, limit)
     .map((s) => s.city);
+}
+
+
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const rad = Math.PI / 180;
+  const p1 = lat1 * rad;
+  const p2 = lat2 * rad;
+  const dp = (lat2 - lat1) * rad;
+  const dl = (lon2 - lon1) * rad;
+  const a = Math.sin(dp / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.min(1, Math.sqrt(a)));
+}
+
+/** 自定义坐标/定位点：找最近的国内城市级地区键，用于景点推荐。 */
+export function nearestChinaPrefKey(lat, lon, maxKm = 150) {
+  let best = null;
+  for (const city of SEARCH_CATALOG) {
+    if (city.china && city.level !== 'city') continue;
+    if (!city.china && city.country !== '中国') continue;
+    const distance = haversineKm(lat, lon, city.lat, city.lon);
+    if (!best || distance < best.distance) {
+      best = { distance, key: city.prefKey || city.name.replace(/市$/, '') };
+    }
+  }
+  return best && best.distance <= maxKm ? best.key : '';
 }
 
 export function parseCoordinates(input) {
@@ -115,6 +231,8 @@ export function coordinateCity(lat, lon, tz = 'UTC') {
     name: `${fmt(lat, 'N', 'S')} ${fmt(lon, 'E', 'W')}`,
     en: 'Custom point',
     country: '自定义坐标',
+    context: '自定义坐标',
+    kind: '坐标',
     lat,
     lon,
     tz,

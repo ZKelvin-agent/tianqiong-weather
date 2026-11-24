@@ -20,6 +20,18 @@
   --sans: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", sans-serif;
   --mono: "SF Mono", "JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace;
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --glass-tint: rgba(12, 18, 27, 0.46);
+  --glass-tint-strong: rgba(10, 15, 23, 0.62);
+  --glass-sheen: linear-gradient(
+    150deg,
+    rgba(255, 255, 255, 0.08),
+    rgba(255, 255, 255, 0.02) 42%,
+    rgba(116, 224, 200, 0.025) 100%
+  );
+  --glass-border: rgba(242, 237, 226, 0.13);
+  --glass-highlight: rgba(255, 255, 255, 0.085);
+  --glass-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+  --glass-blur: blur(24px) saturate(150%);
 }
 
 * {
@@ -1972,5 +1984,161 @@ button {
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+
+/* ---------------------------- frosted glass panels ---------------------------- */
+/* The floating observatory panels share one frosted-glass material: a dark
+   translucent tint, a faint top-left sheen, a hairline border and a soft
+   inset highlight. The 3D globe behind them is blurred by backdrop-filter. */
+
+.search-field,
+.icon-btn,
+.solar-panel,
+.detail,
+.ticker-card,
+.search-results,
+.marker,
+.toast,
+.fallback-copy,
+.cursor-coords,
+.status-pill {
+  border-color: var(--glass-border);
+  background-color: var(--glass-tint);
+  background-image: var(--glass-sheen);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    var(--glass-shadow);
+}
+
+.detail {
+  background-color: var(--glass-tint-strong);
+  backdrop-filter: blur(30px) saturate(160%);
+  -webkit-backdrop-filter: blur(30px) saturate(160%);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    0 34px 90px rgba(0, 0, 0, 0.55);
+}
+
+.search-results,
+.toast,
+.fallback-copy {
+  background-color: var(--glass-tint-strong);
+}
+
+.solar-panel,
+.ticker-card,
+.search-field,
+.icon-btn,
+.status-pill {
+  background-color: rgba(12, 18, 27, 0.44);
+}
+
+.ticker-card {
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+}
+
+.marker {
+  background-color: rgba(10, 15, 23, 0.48);
+  backdrop-filter: blur(12px) saturate(135%);
+  -webkit-backdrop-filter: blur(12px) saturate(135%);
+}
+
+.status-pill {
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+}
+
+.cursor-coords {
+  backdrop-filter: blur(10px) saturate(130%);
+  -webkit-backdrop-filter: blur(10px) saturate(130%);
+}
+
+.search-wrap:focus-within .search-field {
+  border-color: rgba(116, 224, 200, 0.42);
+  background-color: rgba(12, 20, 28, 0.66);
+  background-image: var(--glass-sheen);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    0 0 0 1px rgba(116, 224, 200, 0.08);
+}
+
+.icon-btn:hover {
+  background-color: rgba(255, 255, 255, 0.07);
+  background-image: var(--glass-sheen);
+}
+
+.ticker-card:hover {
+  background-color: rgba(255, 255, 255, 0.07);
+  background-image: var(--glass-sheen);
+}
+
+.ticker-card.is-active {
+  border-color: rgba(255, 177, 92, 0.55);
+  background-color: rgba(27, 21, 13, 0.62);
+  background-image: linear-gradient(
+    150deg,
+    rgba(255, 177, 92, 0.1),
+    rgba(255, 177, 92, 0.02) 58%,
+    rgba(255, 255, 255, 0.03) 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    0 0 0 1px rgba(255, 177, 92, 0.08),
+    0 16px 40px rgba(0, 0, 0, 0.32);
+}
+
+.marker:hover {
+  background-color: rgba(16, 24, 34, 0.72);
+  background-image: var(--glass-sheen);
+}
+
+.marker.is-active {
+  border-color: rgba(255, 177, 92, 0.7);
+  background-color: rgba(31, 23, 13, 0.72);
+  background-image: linear-gradient(
+    150deg,
+    rgba(255, 177, 92, 0.12),
+    rgba(255, 177, 92, 0.02) 62%,
+    rgba(255, 255, 255, 0.03) 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    0 0 0 1px rgba(255, 177, 92, 0.12),
+    0 12px 32px rgba(0, 0, 0, 0.42);
+}
+
+.empty-note {
+  border-color: rgba(255, 122, 107, 0.32);
+  background-color: rgba(30, 14, 14, 0.62);
+  background-image: var(--glass-sheen);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    var(--glass-shadow);
+}
+
+.status-pill {
+  border-color: rgba(242, 237, 226, 0.1);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .search-field,
+  .icon-btn,
+  .solar-panel,
+  .detail,
+  .ticker-card,
+  .search-results,
+  .marker,
+  .toast,
+  .fallback-copy,
+  .cursor-coords,
+  .empty-note,
+  .status-pill {
+    background-color: rgba(8, 12, 19, 0.94);
+    background-image: none;
   }
 }

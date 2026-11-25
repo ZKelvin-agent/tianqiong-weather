@@ -785,17 +785,17 @@ function buildMetrics(current) {
     ? `风速 · ${windName(current.windDir).replace('风', '')}`
     : '风速';
   const items = [
-    ['湿度', metricValue(current.humidity, '%')],
-    [windLabel, `${metricValue(current.wind, 'km/h')}${windArrow}`],
-    ['气压', metricValue(current.pressure, 'hPa')],
-    ['云量', metricValue(current.cloud, '%')],
-    ['降水 · 1h', metricValue(current.precip, 'mm', 1)],
-    ['露点', metricValue(current.dew, '°C', 1)],
+    ['humidity', '湿度', metricValue(current.humidity, '%')],
+    ['wind', windLabel, `${metricValue(current.wind, 'km/h')}${windArrow}`],
+    ['pressure', '气压', metricValue(current.pressure, 'hPa')],
+    ['cloud', '云量', metricValue(current.cloud, '%')],
+    ['precip', '降水 · 1h', metricValue(current.precip, 'mm', 1)],
+    ['dew', '露点', metricValue(current.dew, '°C', 1)],
   ];
   return items
     .map(
-      ([label, value]) =>
-        `<div class="metric"><span class="metric-label">${label}</span><span class="metric-value">${value}</span></div>`,
+      ([key, label, value]) =>
+        `<div class="metric metric-${key}"><span class="metric-label">${label}</span><span class="metric-value">${value}</span></div>`,
     )
     .join('');
 }

@@ -10,7 +10,7 @@
     />
     <meta name="theme-color" content="#05070b" />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2305070b'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%23f2ede2' stroke-width='1.3'/%3E%3Cpath d='M7 16h18M16 7c4 5 4 13 0 18M16 7c-4 5-4 13 0 18' fill='none' stroke='%2374e0c8' stroke-width='.9' opacity='.8'/%3E%3C/svg%3E" />
-    <link rel="stylesheet" href="assets/css/style.css?v=20261125-borders" />
+    <link rel="stylesheet" href="assets/css/style.css?v=20261125-planets" />
   </head>
   <body>
     <div class="scene" id="scene" aria-hidden="true"></div>
@@ -53,6 +53,10 @@
         <button class="icon-btn" id="bordersToggle" type="button" aria-pressed="true" aria-label="显示或隐藏洲界" title="显示/隐藏洲界">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="5.4"/><path d="M2.6 8h10.8M8 2.6c2.2 2.1 2.2 8.7 0 10.8M8 2.6c-2.2 2.1-2.2 8.7 0 10.8"/></svg>
           <span>洲界</span>
+        </button>
+        <button class="icon-btn" id="planetsToggle" type="button" aria-pressed="true" aria-label="显示或隐藏行星" title="显示/隐藏行星">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><circle cx="8" cy="8" r="2.2"/><circle cx="8" cy="8" r="5.6" stroke-dasharray="1.6 2.4"/><circle cx="13.2" cy="4.4" r="1.2" fill="currentColor" stroke="none"/></svg>
+          <span>行星</span>
         </button>
         <button class="icon-btn" id="locateBtn" type="button" aria-label="定位到我的位置" title="定位到我的位置">
           <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="10" cy="10" r="4.6"/><circle cx="10" cy="10" r="1.2" fill="currentColor" stroke="none"/><path d="M10 2.2v3M10 14.8v3M2.2 10h3M14.8 10h3"/></svg>
@@ -152,6 +156,17 @@
       <button class="text-btn" id="emptyRetry" type="button">重试</button>
     </div>
 
+    <div class="planet-layer" id="planetLayer" aria-hidden="true"></div>
+
+    <div class="planet-card" id="planetCard" hidden>
+      <button class="planet-close" id="planetClose" type="button" aria-label="关闭行星知识">×</button>
+      <p class="planet-kicker">太阳系 · 行星知识</p>
+      <h3 class="planet-name" id="planetName">—</h3>
+      <p class="planet-en" id="planetEn">—</p>
+      <ul class="planet-facts" id="planetFacts"></ul>
+      <p class="planet-note">距离与大小为示意；太阳系中所有行星都绕太阳运行。</p>
+    </div>
+
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
     <div class="globe-fallback" id="globeFallback" hidden>
@@ -177,6 +192,6 @@
       <div class="noscript">此页面需要启用 JavaScript 才能渲染 3D 地球与实时天气。</div>
     </noscript>
 
-    <script type="module" src="assets/js/app.js?v=20261125-borders"></script>
+    <script type="module" src="assets/js/app.js?v=20261125-planets"></script>
   </body>
 </html>

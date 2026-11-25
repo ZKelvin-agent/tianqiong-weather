@@ -250,6 +250,13 @@ function cacheDom() {
   el.boot = $('boot');
   el.bootText = $('bootText');
   el.bordersToggle = $('bordersToggle');
+  el.planetsToggle = $('planetsToggle');
+  el.planetLayer = $('planetLayer');
+  el.planetCard = $('planetCard');
+  el.planetName = $('planetName');
+  el.planetEn = $('planetEn');
+  el.planetFacts = $('planetFacts');
+  el.planetClose = $('planetClose');
   el.globeFallback = $('globeFallback');
 }
 
@@ -1227,6 +1234,45 @@ function hideBoot() {
   el.boot.classList.add('is-hidden');
 }
 
+function buildPlanetLabels() {
+  if (!el.planetLayer || !globe?.planets?.length) return;
+  el.planetLayer.innerHTML = '';
+  for (const planet of globe.planets) {
+    const label = document.createElement('span');
+    label.className = 'planet-label';
+    label.textContent = planet.name;
+    el.planetLayer.appendChild(label);
+  }
+}
+
+function updatePlanetLabels() {
+  if (!el.planetLayer || el.planetLayer.hidden || !globe?.planets?.length) return;
+  const nodes = el.planetLayer.children;
+  globe.planets.forEach((planet, index) => {
+    const node = nodes[index];
+    if (!node) return;
+    const screen = globe.projectPlanet(planet);
+    if (!screen?.visible) {
+      node.style.display = 'none';
+      return;
+    }
+    node.style.display = '';
+    node.style.transform = `translate(-50%, -50%) translate(${screen.x}px, ${screen.y}px)`;
+  });
+}
+
+function showPlanetCard(planet) {
+  if (!el.planetCard) return;
+  el.planetName.textContent = planet.name;
+  el.planetEn.textContent = `${planet.en} · 距日第 ${planet.order} 颗`;
+  el.planetFacts.innerHTML = planet.facts.map((fact) => `<li>${escapeHtml(fact)}</li>`).join('');
+  el.planetCard.hidden = false;
+}
+
+function hidePlanetCard() {
+  if (el.planetCard) el.planetCard.hidden = true;
+}
+
 function showGlobeFallback(reason = 'WebGL unavailable') {
   if (state.globeFailed) return;
   state.globeFailed = true;
@@ -1359,7 +1405,19 @@ function wireEvents() {
   });
 
   globe?.onFail(showGlobeFallback);
-  globe?.onFrame(updateMarkerPositions);
+  globe?.onFrame(() => {
+    updateMarkerPositions();
+    updatePlanetLabels();
+  });
+  globe?.onPlanetClick(showPlanetCard);
+  el.planetsToggle?.addEventListener('click', () => {
+    const next = el.planetsToggle.getAttribute('aria-pressed') !== 'true';
+    el.planetsToggle.setAttribute('aria-pressed', String(next));
+    globe.setPlanets(next);
+    el.planetLayer.hidden = !next;
+    if (!next) hidePlanetCard();
+  });
+  el.planetClose?.addEventListener('click', hidePlanetCard);
   globe?.onHover((point) => {
     if (!point) {
       el.cursorCoords.hidden = true;
@@ -1388,6 +1446,7 @@ function init() {
   updateStatus();
 
   globe.whenReady().then(() => {
+    buildPlanetLabels();
     if (globe.failed) {
       showGlobeFallback(globe.failReason);
       return;

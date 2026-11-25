@@ -2164,3 +2164,121 @@ button {
     background-image: none;
   }
 }
+
+
+/* ------------------------------- planets --------------------------------- */
+.planet-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.planet-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  padding: 2px 6px;
+  border: 1px solid rgba(255, 211, 155, 0.28);
+  border-radius: 2px;
+  background: rgba(7, 11, 17, 0.58);
+  color: #ffd39b;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.planet-card {
+  position: fixed;
+  left: 24px;
+  bottom: 150px;
+  z-index: 13;
+  width: 270px;
+  max-width: calc(100vw - 48px);
+  padding: 14px 16px 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: 2px;
+  background-color: var(--glass-tint-strong);
+  background-image: var(--glass-sheen);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    0 24px 60px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(24px) saturate(150%);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+}
+
+.planet-card[hidden] {
+  display: none;
+}
+
+.planet-kicker {
+  margin: 0;
+  color: var(--amber);
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 0.18em;
+}
+
+.planet-name {
+  margin: 4px 0 0;
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+.planet-en {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+
+.planet-facts {
+  margin: 9px 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+.planet-facts li {
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(242, 237, 226, 0.055);
+  color: var(--ink-dim);
+  font-size: 10.5px;
+  line-height: 1.55;
+}
+
+.planet-note {
+  margin: 8px 0 0;
+  color: var(--faint);
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.planet-close {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1;
+  padding: 2px 4px;
+}
+
+.planet-close:hover {
+  color: var(--ink);
+}
+
+@media (max-width: 760px) {
+  .planet-card {
+    left: 10px;
+    right: 10px;
+    bottom: 170px;
+    width: auto;
+  }
+}

@@ -2,6 +2,7 @@ import * as THREE from '../vendor/three.module.js';
 import { OrbitControls } from '../vendor/OrbitControls.js';
 import { subsolarPoint } from './solar.js';
 import { CONTINENT_BORDERS } from '../data/continents.js';
+import { PLANETS } from '../data/planets.js';
 
 const DEG = Math.PI / 180;
 const R = 1;
@@ -66,6 +67,8 @@ export class WeatherGlobe {
     this.failed = false;
     this.failReason = '';
     this.failCallbacks = new Set();
+    this.planetCallbacks = new Set();
+    this.planets = [];
     this.pendingCities = null;
     this.readyPromise = new Promise((resolve) => {
       this.resolveReady = resolve;
@@ -173,6 +176,7 @@ export class WeatherGlobe {
     }
 
     this.buildBorders();
+    this.buildPlanets();
     this.ready = true;
     this.updateSun(new Date());
     this.bindHover();
@@ -418,6 +422,80 @@ export class WeatherGlobe {
 
   setBorders(visible) {
     if (this.borders) this.borders.visible = visible;
+  }
+
+  buildPlanets() {
+    const group = new THREE.Group();
+    const orbitRadius = 1.72;
+    const materialCache = new Map();
+    const ringMaterial = new THREE.LineBasicMaterial({ color: 0x8fa6c4, transparent: true, opacity: 0.22 });
+    const orbitPoints = [];
+    for (let i = 0; i <= 128; i += 1) {
+      const a = (i / 128) * Math.PI * 2;
+      orbitPoints.push(new THREE.Vector3(Math.cos(a) * orbitRadius, 0, Math.sin(a) * orbitRadius));
+    }
+    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(orbitPoints), ringMaterial));
+    this.planets = [];
+    PLANETS.forEach((planet, index) => {
+      if (planet.key === 'earth') return;
+      const angle = (index / (PLANETS.length - 1)) * Math.PI * 2 - Math.PI / 2;
+      const mesh = new THREE.Mesh(
+        new THREE.SphereGeometry(planet.size, 24, 16),
+        materialCache.get(planet.color) ||
+          (() => {
+            const material = new THREE.MeshBasicMaterial({ color: planet.color });
+            materialCache.set(planet.color, material);
+            return material;
+          })(),
+      );
+      mesh.position.set(Math.cos(angle) * orbitRadius, 0, Math.sin(angle) * orbitRadius);
+      mesh.userData.planet = planet;
+      group.add(mesh);
+      if (planet.key === 'saturn') {
+        const saturnRing = new THREE.Mesh(
+          new THREE.RingGeometry(planet.size * 1.5, planet.size * 2.3, 48),
+          new THREE.MeshBasicMaterial({ color: 0xd8c48f, side: THREE.DoubleSide, transparent: true, opacity: 0.55 }),
+        );
+        saturnRing.rotation.x = Math.PI / 2.3;
+        mesh.add(saturnRing);
+      }
+      this.planets.push({ ...planet, mesh });
+    });
+    this.planetGroup = group;
+    this.scene.add(group);
+    const canvas = this.renderer.domElement;
+    canvas.addEventListener('click', (event) => {
+      const rect = canvas.getBoundingClientRect();
+      const ndc = new THREE.Vector2(
+        ((event.clientX - rect.left) / rect.width) * 2 - 1,
+        -((event.clientY - rect.top) / rect.height) * 2 + 1,
+      );
+      const raycaster = new THREE.Raycaster();
+      raycaster.setFromCamera(ndc, this.camera);
+      const hit = raycaster.intersectObjects(this.planets.map((p) => p.mesh), false)[0];
+      if (!hit) return;
+      const planet = this.planets.find((p) => p.mesh === hit.object);
+      if (planet) for (const cb of this.planetCallbacks) cb(planet);
+    });
+  }
+
+  setPlanets(visible) {
+    if (this.planetGroup) this.planetGroup.visible = visible;
+  }
+
+  projectPlanet(planet) {
+    if (!planet?.mesh) return null;
+    const p = planet.mesh.position.clone().project(this.camera);
+    return {
+      x: (p.x * 0.5 + 0.5) * window.innerWidth,
+      y: (-p.y * 0.5 + 0.5) * window.innerHeight,
+      visible: p.z < 1,
+    };
+  }
+
+  onPlanetClick(cb) {
+    this.planetCallbacks.add(cb);
+    return () => this.planetCallbacks.delete(cb);
   }
 
   updateSun(date = new Date()) {

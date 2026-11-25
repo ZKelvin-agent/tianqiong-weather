@@ -1,6 +1,7 @@
 import * as THREE from '../vendor/three.module.js';
 import { OrbitControls } from '../vendor/OrbitControls.js';
 import { subsolarPoint } from './solar.js';
+import { CONTINENT_BORDERS } from '../data/continents.js';
 
 const DEG = Math.PI / 180;
 const R = 1;
@@ -171,6 +172,7 @@ export class WeatherGlobe {
       this.buildFallbackEarth();
     }
 
+    this.buildBorders();
     this.ready = true;
     this.updateSun(new Date());
     this.bindHover();
@@ -386,6 +388,36 @@ export class WeatherGlobe {
     }
     this.failCallbacks.add(callback);
     return () => this.failCallbacks.delete(callback);
+  }
+
+  buildBorders() {
+    const material = new THREE.LineBasicMaterial({
+      color: 0xffd39b,
+      transparent: true,
+      opacity: 0.5,
+      depthWrite: false,
+    });
+    const group = new THREE.Group();
+    for (const continent of CONTINENT_BORDERS) {
+      for (const ring of continent.rings) {
+        const positions = [];
+        for (const [lon, lat] of ring) {
+          const point = latLonToVec3(lat, lon, R * 1.003);
+          positions.push(point.x, point.y, point.z);
+        }
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        const line = new THREE.Line(geometry, material);
+        line.renderOrder = 2;
+        group.add(line);
+      }
+    }
+    this.borders = group;
+    this.scene.add(group);
+  }
+
+  setBorders(visible) {
+    if (this.borders) this.borders.visible = visible;
   }
 
   updateSun(date = new Date()) {

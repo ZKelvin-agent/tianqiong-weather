@@ -249,6 +249,7 @@ function cacheDom() {
   el.emptyRetry = $('emptyRetry');
   el.boot = $('boot');
   el.bootText = $('bootText');
+  el.bordersToggle = $('bordersToggle');
   el.globeFallback = $('globeFallback');
 }
 
@@ -1279,6 +1280,12 @@ function updateMarkerPositions() {
 /* ---------------------------------- events -------------------------------- */
 
 function wireEvents() {
+  el.bordersToggle?.addEventListener('click', () => {
+    const next = el.bordersToggle.getAttribute('aria-pressed') !== 'true';
+    el.bordersToggle.setAttribute('aria-pressed', String(next));
+    globe.setBorders(next);
+  });
+
   el.refreshBtn.addEventListener('click', () => {
     if (state.loading) {
       toast('正在同步，请稍候', { duration: 2200 });

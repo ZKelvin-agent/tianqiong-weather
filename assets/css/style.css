@@ -551,6 +551,17 @@ button {
   transform: scale(0.97);
 }
 
+.icon-btn[aria-pressed="false"] {
+  color: var(--faint);
+  border-color: var(--line);
+}
+
+.icon-btn[aria-pressed="true"] {
+  color: var(--amber);
+  border-color: rgba(255, 177, 92, 0.34);
+  background-color: rgba(255, 177, 92, 0.07);
+}
+
 .icon-btn.is-loading svg {
   animation: spin 1s linear infinite;
 }

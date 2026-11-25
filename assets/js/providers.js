@@ -131,6 +131,7 @@ async function fetchOpenMeteo(cities, signal) {
     hourly: 'temperature_2m,weather_code,precipitation_probability',
     daily: 'weather_code,temperature_2m_max,temperature_2m_min',
     timezone: 'auto',
+    temperature_unit: 'celsius',
     forecast_days: '6',
     wind_speed_unit: 'kmh',
   });

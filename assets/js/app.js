@@ -537,7 +537,7 @@ function renderWeather() {
         const color = tempColor(weather.current.temp);
         icon.innerHTML = weatherSvg(weather.current.code, weather.current.isDay);
         icon.style.color = TONE_COLORS[meta.tone] || TONE_COLORS.cloud;
-        temp.textContent = `${Math.round(weather.current.temp)}°`;
+        temp.textContent = `${Math.round(weather.current.temp)}°C`;
         temp.style.color = color;
         marker.setAttribute(
           'aria-label',
@@ -555,7 +555,7 @@ function renderWeather() {
         const meta = conditionMeta(weather.current.code);
         ticker.icon.innerHTML = weatherSvg(weather.current.code, weather.current.isDay);
         ticker.icon.style.color = TONE_COLORS[meta.tone] || TONE_COLORS.cloud;
-        ticker.temp.textContent = `${Math.round(weather.current.temp)}°`;
+        ticker.temp.textContent = `${Math.round(weather.current.temp)}°C`;
         ticker.temp.style.color = tempColor(weather.current.temp);
       } else {
         ticker.icon.innerHTML = '';
@@ -901,7 +901,7 @@ function buildDaily(dailyFull) {
         <span class="day-name">${dayLabel(day.date, index)}</span>
         <span class="day-icon" title="${meta.label}" style="color:${TONE_COLORS[meta.tone] || TONE_COLORS.cloud}">${weatherSvg(day.code, true)}</span>
         <span class="day-range"><i style="left:${start.toFixed(1)}%; width:${width.toFixed(1)}%"></i></span>
-        <span class="day-temps"><b>${Math.round(day.max)}°</b><span>${Math.round(day.min)}°</span></span>
+        <span class="day-temps"><b>${Math.round(day.max)}°C</b><span>${Math.round(day.min)}°C</span></span>
       </div>`;
     })
     .join('');
